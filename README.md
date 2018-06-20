@@ -50,5 +50,5 @@ npm run build
 
 
 ## License
-[Apache-2.0](https://github.com/qktechies/icourses/master/LICENSE)
+[Apache-2.0](https://github.com/qktechies/icourses/blob/master/README.md)
 
