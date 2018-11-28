@@ -13,8 +13,8 @@ Vue.http = Vue.prototype.$http = axios
 Vue.config.productionTip = false
 
 axios.defaults.baseURL = 'http://mobile.icourses.cn'
-// 最长超时10秒
-axios.defaults.timeout = 10000
+// 最长超时60秒
+// axios.defaults.timeout = 60000
 
 axios.interceptors.response.use(response => {
   let data = response.data
