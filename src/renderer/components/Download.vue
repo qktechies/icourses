@@ -256,25 +256,30 @@
 
               // 课程章节下载
               if (this.shareCourseDownloadList.indexOf(this.DOWNLOAD_CHARPTER) !== -1) {
-                let data = await this.getShareCourseFileList(row.courseId, courseType)
+                let data = []
+                try {
+                  data = await this.getShareCourseFileListOld(row.courseId, courseType)
+                } catch (e) {
+                  data = await this.getShareCourseFileList(row.courseId, courseType)
+                }
                 addDataToTaskArr(data, this.DOWNLOAD_CHARPTER)
               }
 
               // 习题作业下载
               if (this.shareCourseDownloadList.indexOf(this.DOWNLOAD_EXERCISE) !== -1) {
-                let data = this.getShareCourseExcercises(row.courseId, courseType)
+                let data = await this.getShareCourseExcercises(row.courseId, courseType)
                 addDataToTaskArr(data, this.DOWNLOAD_EXERCISE)
               }
 
               // 测试试卷下载
               if (this.shareCourseDownloadList.indexOf(this.DOWNLOAD_EXAM) !== -1) {
-                let data = this.getShareCourseExam(row.courseId, courseType)
+                let data = await this.getShareCourseExam(row.courseId, courseType)
                 addDataToTaskArr(data, this.DOWNLOAD_EXAM)
               }
 
               // 其他资源下载
               if (this.shareCourseDownloadList.indexOf(this.DOWNLOAD_OTHER) !== -1) {
-                let data = this.getShareCourseOtherRes(row.courseId, courseType)
+                let data = await this.getShareCourseOtherRes(row.courseId, courseType)
                 for (let i = 0; i < data.length; i++) {
                   let resInfo = data[i]
                   taskArr.push({
@@ -393,12 +398,12 @@
       },
 
       // 资源共享课视频列表
-      // getShareCourseFileList (courseId, subjectType) {
-      //   return this.$http.post('/hep-mobile/sword/app/share/detail/getCharacters', qs.stringify({
-      //     courseId: courseId,
-      //     subjectType: subjectType
-      //   }))
-      // },
+      getShareCourseFileListOld (courseId, subjectType) {
+        return this.$http.post('/hep-mobile/sword/app/share/detail/getCharacters', qs.stringify({
+          courseId: courseId,
+          subjectType: subjectType
+        }))
+      },
 
       async getShareCourseFileList (courseId, subjectType) {
         let data = await this.$http.post('/hep-mobile/sword/app/share/detail/getCharactersInfo', qs.stringify({
@@ -415,8 +420,6 @@
             subCharpter.resList = result
           }
         }
-
-        console.log('data:', data)
 
         return data
       },
