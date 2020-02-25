@@ -13,6 +13,8 @@ Vue.http = Vue.prototype.$http = axios
 Vue.config.productionTip = false
 
 axios.defaults.baseURL = 'http://mobile.icourses.cn'
+// axios.defaults.headers.common['User-Agent'] = 'icourses/1.0.1.201904191630/2.1.123/2(iPhone12,1; iOS 13.3.1)'
+
 // 最长超时60秒
 // axios.defaults.timeout = 60000
 

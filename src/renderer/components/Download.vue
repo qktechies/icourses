@@ -1,10 +1,10 @@
 <template>
     <div id="download">
         <div style="margin-bottom: 10px">
-            <el-input style="width: calc(100% - 176px);" placeholder="请输入课程名、老师、学校名查询" v-model="keyword" class="input-with-select" @keyup.enter.native="searchCourse">
+            <el-input style="width: calc(100% - 85px);" placeholder="请输入课程名、老师、学校名查询" v-model="keyword" class="input-with-select" @keyup.enter.native="searchCourse">
                 <el-button slot="append" icon="el-icon-search" @click="searchCourse"></el-button>
             </el-input>
-            <el-button type="primary" @click="aria2DialogVisible = true" style="margin-left: 10px">修改aria2下载路径</el-button>
+            <el-button type="primary" @click="aria2DialogVisible = true" style="margin-left: 10px">设置</el-button>
         </div>
 
         <el-table border :data="courseData" v-loading="loading" >
@@ -79,13 +79,23 @@
                 :total="totalPage">
         </el-pagination>
 
-        <el-dialog title="修改aria2默认下载路径" :visible.sync="aria2DialogVisible">
-            <el-form label-width="80px">
+        <el-dialog title="设置" :visible.sync="aria2DialogVisible" width="70%">
+            <el-form label-width="130px">
                 <el-form-item label="下载路径:">
-                    <el-input v-model="aria2CacheBaseFolder" auto-complete="off" disabled></el-input>
+                    <el-input v-model="aria2CacheBaseFolder" auto-complete="off" disabled class="input-with-select">
+                      
+                      <el-button type="primary" slot="append" @click="selectAria2CacheFolder()">修改</el-button>
+                    </el-input>
+
                 </el-form-item>
-                <el-form-item>
-                    <el-button type="primary" @click="selectAria2CacheFolder()">修改</el-button>
+
+                <el-form-item label="资源共享课下载：">
+                  <el-checkbox-group v-model="shareCourseDownloadList">
+                    <el-checkbox :label="DOWNLOAD_CHARPTER"></el-checkbox>
+                    <el-checkbox :label="DOWNLOAD_EXERCISE"></el-checkbox>
+                    <el-checkbox :label="DOWNLOAD_EXAM"></el-checkbox>
+                    <el-checkbox :label="DOWNLOAD_OTHER"></el-checkbox>
+                  </el-checkbox-group>
                 </el-form-item>
             </el-form>
             <div slot="footer" class="dialog-footer">
@@ -106,6 +116,11 @@
   export default {
     name: 'download',
     data () {
+      const DOWNLOAD_CHARPTER = '课程章节'
+      const DOWNLOAD_EXERCISE = '习题作业'
+      const DOWNLOAD_EXAM = '测试试卷'
+      const DOWNLOAD_OTHER = '其他资源'
+
       return {
         keyword: '',
         loading: false,
@@ -113,7 +128,12 @@
         totalPage: 0,
         currentPage: 1,
         aria2DialogVisible: false,
-        aria2CacheBaseFolder: ''
+        aria2CacheBaseFolder: '',
+        DOWNLOAD_CHARPTER,
+        DOWNLOAD_EXERCISE,
+        DOWNLOAD_EXAM,
+        DOWNLOAD_OTHER,
+        shareCourseDownloadList: [DOWNLOAD_CHARPTER, DOWNLOAD_EXERCISE, DOWNLOAD_EXAM, DOWNLOAD_OTHER]
       }
     },
     mounted () {
@@ -132,175 +152,153 @@
       },
 
       // 迅雷下载
-      thunderDownload (index, row) {
-        let courseType = row.courseType
+      async thunderDownload (index, row) {
+        const loading = this.$loading({
+          lock: true,
+          text: '导出迅雷下载中...',
+          spinner: 'el-icon-loading'
+        })
 
-        if (courseType === 1 || courseType === 2) {
-          const loading = this.$loading({
-            lock: true,
-            text: '导出迅雷下载中',
-            spinner: 'el-icon-loading'
+        try {
+          let { baseFolder, tasks } = await this.getTaskArr(index, row)
+
+          tasks = tasks.map(task => {
+            return {
+              name: task.out,
+              url: task.url,
+              dir: task.dir
+            }
           })
 
-          let destFolder = this.getTextFromHtml(row.courseSchool + '_' + row.courseName)
-
-          if (courseType === 2) {
-            // 视频公开课
-            this.getVideoCourseFileList(row.courseId, row.courseType).then(data => {
-              let taskArr = []
-
-              for (let i = 0; i < data.length; i++) {
-                let resInfo = data[i]
-                taskArr.push({
-                  url: resInfo.fullLinkUrl,
-                  name: resInfo.no + '_' + resInfo.title + path.extname(resInfo.fullLinkUrl)
-                })
-              }
-
-              /* global thunderLink */
-              thunderLink.newTask({
-                taskGroupName: destFolder,
-                tasks: taskArr
-              })
-
-              loading.close()
-            }).catch(_ => {
-              loading.close()
-            })
-          } else {
-            // 资源共享课
-            this.getShareCourseFileList(row.courseId, row.courseType).then(data => {
-              let taskArr = []
-              for (let i = 0; i < data.length; i++) {
-                let charpterTitle = (i + 1) + '_' + data[i].title
-
-                let childList = data[i].childList
-                let resList = data[i].resList
-
-                let idx = 1
-
-                if (Array.isArray(resList)) {
-                  for (let j = 0; j < resList.length; j++) {
-                    let resInfo = resList[j]
-                    taskArr.push({
-                      url: resInfo.fullResUrl,
-                      name: charpterTitle + '_' + idx + '_' + resInfo.title + '.' + resInfo.mediaType
-                    })
-
-                    idx++
-                  }
-                }
-
-                for (let j = 0; j < childList.length; j++) {
-                  let resList = childList[j].resList
-                  for (let k = 0; k < resList.length; k++) {
-                    let resInfo = resList[k]
-
-                    taskArr.push({
-                      url: resInfo.fullResUrl,
-                      name: charpterTitle + '_' + idx + '_' + resInfo.title + '.' + resInfo.mediaType
-                    })
-                    idx++
-                  }
-                }
-              }
-
-              /* global thunderLink */
-              thunderLink.newTask({
-                taskGroupName: destFolder,
-                tasks: taskArr
-              })
-
-              loading.close()
-            }).catch(_ => {
-              loading.close()
-            })
-          }
-        } else {
-          this.$message.error('暂不支持该课程下载...')
+          // 通过参数创建批量任务
+          /* global thunderLink */
+          thunderLink.newTask({
+            downloadDir: baseFolder,
+            tasks: tasks
+          })
+        } catch (e) {
+          this.$message.error(e.message)
+          loading.close()
         }
       },
 
-      aria2Download (index, row) {
+      // aria2下载
+      async aria2Download (index, row) {
+        const loading = this.$loading({
+          lock: true,
+          text: '导出aria2下载中...',
+          spinner: 'el-icon-loading'
+        })
+
+        try {
+          let { baseFolder, tasks } = await this.getTaskArr(index, row)
+
+          tasks = tasks.map(task => {
+            return ['addUri', [task.url], {
+              dir: path.join(baseFolder, task.dir),
+              out: task.out
+            }]
+          })
+          this.aria2AddDownloadTask(tasks, () => {
+            loading.close()
+          })
+        } catch (e) {
+          this.$message.error(e.message)
+          loading.close()
+        }
+      },
+
+      async getTaskArr (index, row) {
         let courseType = row.courseType
 
         if (courseType === 1 || courseType === 2) {
-          const loading = this.$loading({
-            lock: true,
-            text: '导出aria2下载中...',
-            spinner: 'el-icon-loading'
-          })
-
           // 默认下载到用户下载路径下
           let baseFolder = path.join(this.aria2CacheBaseFolder, this.getTextFromHtml(row.courseSchool + '_' + row.courseName))
 
-          if (courseType === 2) {
-            // 视频公开课下载
-            this.getVideoCourseFileList(row.courseId, courseType).then(data => {
+          try {
+            if (courseType === 2) {
+              // 视频公开课下载
+              let data = await this.getVideoCourseFileList(row.courseId, courseType)
               let taskArr = []
               for (let i = 0; i < data.length; i++) {
                 let resInfo = data[i]
-                taskArr.push(['addUri', [resInfo.fullLinkUrl], {
-                  dir: baseFolder,
-                  out: i + '_' + resInfo.title + '.' + path.extname(resInfo.fullLinkUrl)
-                }])
+                taskArr.push({
+                  dir: '.',
+                  out: i + '_' + resInfo.title + '.' + path.extname(resInfo.fullLinkUrl),
+                  url: resInfo.fullLinkUrl
+                })
               }
 
-              this.aria2AddDownloadTask(taskArr, () => {
-                loading.close()
-              })
-            }).catch(e => {
-              loading.close()
-            })
-          } else {
-            // 资源共享课下载
-            this.getShareCourseFileList(row.courseId, courseType).then(data => {
+              return Promise.resolve(taskArr)
+            } else {
+              // 资源共享课下载
               let taskArr = []
-              for (let i = 0; i < data.length; i++) {
-                let charpterTitle = (i + 1) + '_' + data[i].title
-                let charpterFolder = path.join(baseFolder, charpterTitle)
 
-                let childList = data[i].childList
-                let resList = data[i].resList
+              let addDataToTaskArr = (data, subDir) => {
+                for (let i = 0; i < data.length; i++) {
+                  let charpter = data[i]
 
-                let idx = 1
+                  for (let j = 0; j < charpter.childList.length; j++) {
+                    let subCharpter = charpter.childList[j]
 
-                if (Array.isArray(resList)) {
-                  for (let j = 0; j < resList.length; j++) {
-                    let resInfo = resList[j]
-                    taskArr.push(['addUri', [resInfo.fullResUrl], {
-                      dir: charpterFolder,
-                      out: idx + '_' + resInfo.title + '.' + resInfo.mediaType
-                    }])
+                    for (let k = 0; k < subCharpter.resList.length; k++) {
+                      let resInfo = subCharpter.resList[k]
 
-                    idx++
-                  }
-                }
-
-                for (let j = 0; j < childList.length; j++) {
-                  let childResList = childList[j].resList
-                  for (let k = 0; k < childResList.length; k++) {
-                    let resInfo = childResList[k]
-
-                    taskArr.push(['addUri', [resInfo.fullResUrl], {
-                      dir: charpterFolder,
-                      out: idx + '_' + resInfo.title + '.' + resInfo.mediaType
-                    }])
-
-                    idx++
+                      taskArr.push({
+                        dir: `${subDir}/第${charpter.selfId}章 ${charpter.title}/${charpter.selfId}.${subCharpter.selfId}${subCharpter.title}`,
+                        out: (k + 1) + '_' + resInfo.title + '.' + resInfo.mediaType,
+                        url: resInfo.fullResUrl
+                      })
+                    }
                   }
                 }
               }
 
-              this.aria2AddDownloadTask(taskArr, () => {
-                loading.close()
+              // 课程章节下载
+              if (this.shareCourseDownloadList.indexOf(this.DOWNLOAD_CHARPTER) !== -1) {
+                let data = await this.getShareCourseFileList(row.courseId, courseType)
+                addDataToTaskArr(data, this.DOWNLOAD_CHARPTER)
+              }
+
+              // 习题作业下载
+              if (this.shareCourseDownloadList.indexOf(this.DOWNLOAD_EXERCISE) !== -1) {
+                let data = this.getShareCourseExcercises(row.courseId, courseType)
+                addDataToTaskArr(data, this.DOWNLOAD_EXERCISE)
+              }
+
+              // 测试试卷下载
+              if (this.shareCourseDownloadList.indexOf(this.DOWNLOAD_EXAM) !== -1) {
+                let data = this.getShareCourseExam(row.courseId, courseType)
+                addDataToTaskArr(data, this.DOWNLOAD_EXAM)
+              }
+
+              // 其他资源下载
+              if (this.shareCourseDownloadList.indexOf(this.DOWNLOAD_OTHER) !== -1) {
+                let data = this.getShareCourseOtherRes(row.courseId, courseType)
+                for (let i = 0; i < data.length; i++) {
+                  let resInfo = data[i]
+                  taskArr.push({
+                    dir: this.DOWNLOAD_OTHER,
+                    out: (i + 1) + '_' + resInfo.title + '.' + resInfo.mediaType,
+                    url: resInfo.fullLinkUrl
+                  })
+                }
+              }
+
+              if (taskArr.length === 0) {
+                throw new Error('请在设置中勾选需要下载的内容')
+              }
+
+              return Promise.resolve({
+                baseFolder: baseFolder,
+                tasks: taskArr
               })
-            }).catch(e => {
-              loading.close()
-            })
+            }
+          } catch (e) {
+            return Promise.reject(new Error(`获取下载内容失败，失败原因:${e.message}`))
           }
         } else {
-          this.$message.error('暂不支持该课程下载...')
+          return Promise.reject(new Error('暂不支持该课程下载...'))
         }
       },
 
@@ -395,8 +393,53 @@
       },
 
       // 资源共享课视频列表
-      getShareCourseFileList (courseId, subjectType) {
-        return this.$http.post('/hep-mobile/sword/app/share/detail/getCharacters', qs.stringify({
+      // getShareCourseFileList (courseId, subjectType) {
+      //   return this.$http.post('/hep-mobile/sword/app/share/detail/getCharacters', qs.stringify({
+      //     courseId: courseId,
+      //     subjectType: subjectType
+      //   }))
+      // },
+
+      async getShareCourseFileList (courseId, subjectType) {
+        let data = await this.$http.post('/hep-mobile/sword/app/share/detail/getCharactersInfo', qs.stringify({
+          courseId: courseId,
+          subjectType: subjectType
+        }))
+
+        for (let charpter of data) {
+          for (let subCharpter of charpter.childList) {
+            let result = await this.$http.post('/hep-mobile/sword/app/share/detail/getCharacterRess', qs.stringify({
+              sectionId: subCharpter.id
+            }))
+
+            subCharpter.resList = result
+          }
+        }
+
+        console.log('data:', data)
+
+        return data
+      },
+
+      // 资源共享课习题作业
+      getShareCourseExcercises (courseId, subjectType) {
+        return this.$http.post('/hep-mobile/sword/app/share/detail/getExcercises', qs.stringify({
+          courseId: courseId,
+          subjectType: subjectType
+        }))
+      },
+
+      // 资源共享课测试试卷
+      getShareCourseExam (courseId, subjectType) {
+        return this.$http.post('/hep-mobile/sword/app/share/detail/getExam', qs.stringify({
+          courseId: courseId,
+          subjectType: subjectType
+        }))
+      },
+
+      // 资源共享课其他资源
+      getShareCourseOtherRes (courseId, subjectType) {
+        return this.$http.post('/hep-mobile/sword/app/share/detail/getOtherRes', qs.stringify({
           courseId: courseId,
           subjectType: subjectType
         }))
