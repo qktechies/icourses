@@ -285,7 +285,7 @@
                   taskArr.push({
                     dir: this.DOWNLOAD_OTHER,
                     out: (i + 1) + '_' + resInfo.title + '.' + resInfo.mediaType,
-                    url: resInfo.fullLinkUrl
+                    url: resInfo.fullResUrl
                   })
                 }
               }
